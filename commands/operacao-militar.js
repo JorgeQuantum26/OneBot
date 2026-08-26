@@ -4,6 +4,7 @@ const db = require('../systems/rpg-db');
 const { getDadosPais } = require('../systems/real-countries-data');
 const { renderizarFront } = require('../systems/front-map');
 const { criarGuerra, normalizarGuerra, registrarBatalha } = require('../systems/guerra-state');
+const { reduzirPopulacao } = require('../systems/pais-mutacoes');
 
 const PATENTES = {
     coronel: { bonus: 1.05, custo: 0, label: 'Coronel', emoji: '🎖️' },
@@ -284,7 +285,8 @@ exports.run = async (client, message, args) => {
             bonusBases *
             (suprimentoOk ? 1.0 : 0.6);
         const poderDefensor = calcularPoderDefesa(paisAlvo) * 1.3;
-        const poderFinalDefensor = Math.random() < 0.3 ? poderDefensor * 1.3 : poderDefensor;
+        const prontidaoDefensiva = calcularProntidaoDefensiva(paisAlvo);
+        const poderFinalDefensor = poderDefensor * prontidaoDefensiva;
         const vitoria = poderAtacante > poderFinalDefensor;
 
         let perdaAtacante = Math.floor((Number(exercito.infantaria) || 0) * (vitoria ? 0.04 : 0.1));
@@ -294,7 +296,11 @@ exports.run = async (client, message, args) => {
 
         if (tipoOperacao === 'ataque_drones') {
             const arsenalDrones = pais.arsenal_drones || {};
-            const dronesUsados = Math.floor(Math.random() * 15) + 10;
+            const dronesDisponiveis = Object.values(arsenalDrones).reduce(
+                (total, quantidade) => total + (Number(quantidade) || 0),
+                0
+            );
+            const dronesUsados = Math.min(dronesDisponiveis, Math.max(5, Math.floor(dronesDisponiveis * 0.25)));
             let restantes = dronesUsados;
             for (const tipo of ['drone_fpv', 'drone_shahed', 'drone_bayraktar']) {
                 if (restantes <= 0) break;
@@ -308,7 +314,7 @@ exports.run = async (client, message, args) => {
             const danoDrone = dronesUsados * 500;
             db.subtract(`pais_${alvo}.exercito.infantaria`, danoDrone);
             db.subtract(`pais_${alvo}.infraestrutura`, Math.floor(dronesUsados / 10));
-            db.subtract(`pais_${alvo}.populacao`, danoDrone);
+            reduzirPopulacao(alvo, danoDrone);
             db.add(`pais_${alvo}.inflacao`, 0.05);
             perdaAtacante = 0;
             perdaDefensor = danoDrone;
@@ -319,12 +325,12 @@ exports.run = async (client, message, args) => {
         db.subtract(`pais_${nomePais}.tesouro`, op.custo);
         if (tipoOperacao !== 'ataque_drones') db.subtract(`pais_${nomePais}.exercito.infantaria`, perdaAtacante);
         db.subtract(`pais_${alvo}.exercito.infantaria`, perdaDefensor);
-        db.subtract(`pais_${alvo}.populacao`, baixasCivis);
+        reduzirPopulacao(alvo, baixasCivis);
         db.subtract(`pais_${alvo}.infraestrutura`, danoInfra);
         if (tipoOperacao === 'bombardeio_nuclear') {
             db.subtract(`pais_${nomePais}.arsenal_nuclear.ogiva_base`, 1);
             db.subtract(`pais_${alvo}.infraestrutura`, 3);
-            db.subtract(`pais_${alvo}.populacao`, Math.floor((paisAlvo.populacao || 0) * 0.05));
+            reduzirPopulacao(alvo, Math.floor((paisAlvo.populacao || 0) * 0.05));
         }
 
         romperAcordos(nomePais, alvo);
@@ -349,7 +355,7 @@ exports.run = async (client, message, args) => {
             db.set(`pais_${nomePais}.bases_militares`, pais.bases_militares);
         }
 
-        const progresso = vitoria ? Math.floor(Math.random() * 25) + 60 : Math.floor(Math.random() * 20) + 15;
+        const progresso = calcularProgressoOperacao(vitoria, poderAtacante, poderFinalDefensor, suprimentoOk);
         let guerras = db.get('guerras_ativas') || [];
         const idxExistente = guerras.findIndex(
             (g) => (g.atacante === nomePais && g.defensor === alvo) || (g.atacante === alvo && g.defensor === nomePais)
@@ -387,7 +393,6 @@ exports.run = async (client, message, args) => {
             perdaDefensor,
             baixasCivis,
             danoInfra,
-            progressoGanho: vitoria ? Math.floor(progresso / 10) : 0,
             progressoGanho: vitoria ? Math.max(1, Math.floor(progresso / 10)) : 0,
             resultado: vitoria ? 'vitoria' : 'resistencia'
         });
@@ -475,17 +480,19 @@ exports.run = async (client, message, args) => {
             `☢️ **CONFIRMAR ATAQUE NUCLEAR**\n${ogiva.nome} contra **${alvo}**!\nDigite \`CONFIRMAR\` em 30s.`
         );
         try {
-            await message.channel.awaitMessages(
-                (m) => m.author.id === userId && m.content.toUpperCase() === 'CONFIRMAR',
-                { max: 1, time: 30000, errors: ['time'] }
-            );
+            await message.channel.awaitMessages({
+                filter: (m) => m.author.id === userId && m.content.toUpperCase() === 'CONFIRMAR',
+                max: 1,
+                time: 30000,
+                errors: ['time']
+            });
         } catch {
             return confirmMsg.edit('⏰ Cancelado.');
         }
 
         const mortos = Math.floor((paisAlvo.populacao || 0) * 0.05 * ogiva.poder);
         db.subtract(`pais_${nomePais}.arsenal_nuclear.${ogiva.chave}`, 1);
-        db.subtract(`pais_${alvo}.populacao`, mortos);
+        const perdasPopulacionais = reduzirPopulacao(alvo, mortos);
         db.subtract(`pais_${alvo}.infraestrutura`, Math.min(5, ogiva.poder * 0.5));
         db.subtract(`pais_${nomePais}.reputacaoDiplomatica`, 50);
         db.add(`pais_${alvo}.inflacao`, 0.2);
@@ -495,7 +502,7 @@ exports.run = async (client, message, args) => {
         const nomeAlvo = dadosAlvo ? `${dadosAlvo.bandeira} ${dadosAlvo.nomeFormal}` : alvo;
         const noticia = {
             titulo: '☢️ ATAQUE NUCLEAR!',
-            descricao: `**${nomeFormal}** lançou **${ogiva.nome}** contra **${nomeAlvo}**!\n💀 ${mortos.toLocaleString('pt-BR')} mortos.\n🌍 Mundo em choque!`,
+            descricao: `**${nomeFormal}** lançou **${ogiva.nome}** contra **${nomeAlvo}**!\n💀 ${Math.abs(perdasPopulacionais.variacao).toLocaleString('pt-BR')} mortos.\n🌍 Mundo em choque!`,
             tipo: 'militar',
             impacto: 'negativo',
             timestamp: Date.now(),
@@ -510,12 +517,18 @@ exports.run = async (client, message, args) => {
 
         return confirmMsg.edit({
             content: null,
-            embed: new Discord.EmbedBuilder()
-                .setTitle('☢️ Ataque Nuclear!')
-                .setColor('#992d22')
-                .setDescription(`${ogiva.nome} lançada!`)
-                .addFields({ name: '💀 Mortos', value: mortos.toLocaleString('pt-BR'), inline: true })
-                .addFields({ name: '🌍 Reputação', value: '-50', inline: true })
+            embeds: [
+                new Discord.EmbedBuilder()
+                    .setTitle('☢️ Ataque Nuclear!')
+                    .setColor('#992d22')
+                    .setDescription(`${ogiva.nome} lançada!`)
+                    .addFields({
+                        name: '💀 Mortos',
+                        value: perdasPopulacionais.variacao.toLocaleString('pt-BR'),
+                        inline: true
+                    })
+                    .addFields({ name: '🌍 Reputação', value: '-50', inline: true })
+            ]
         });
     }
 
@@ -1306,6 +1319,23 @@ function calcularPoderDefesa(pais) {
     const poderBase = calcularPoderMilitar(pais);
     const infra = Number(pais.infraestrutura) || 1;
     return Math.floor(poderBase * (1 + infra * 0.1) * 1.3);
+}
+
+function calcularProntidaoDefensiva(pais) {
+    const infraestrutura = Math.max(0, Math.min(5, Number(pais.infraestrutura) || 0));
+    const bases = Array.isArray(pais.bases_militares) ? pais.bases_militares : [];
+    const suprimentoMedio = bases.length
+        ? bases.reduce((total, base) => total + Math.max(0, Math.min(100, Number(base.suprimento) || 0)), 0) /
+          bases.length
+        : 60;
+    const treinamento = Math.max(0, Math.min(1, Number(pais.treinamentoMilitar) || 0));
+    return 0.85 + infraestrutura * 0.03 + (suprimentoMedio / 100) * 0.1 + treinamento * 0.05;
+}
+
+function calcularProgressoOperacao(vitoria, poderAtacante, poderDefensor, suprimentoOk) {
+    const razao = poderAtacante / Math.max(1, poderDefensor);
+    const base = vitoria ? 8 + Math.min(17, Math.floor(razao * 6)) : Math.max(2, 7 - Math.floor(razao * 3));
+    return Math.max(1, Math.min(30, base + (suprimentoOk ? 2 : -2)));
 }
 
 function romperAcordos(pais1, pais2) {

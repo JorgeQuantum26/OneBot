@@ -102,7 +102,10 @@ client.on('interactionCreate', async (interaction) => {
                     author: interaction.user,
                     channel: { send: (payload) => interaction.followUp(payload) }
                 };
-                return operacao.run(client, mensagemVirtual, ['atacar', alvo, tipo]);
+                await operacao.run(client, mensagemVirtual, ['atacar', alvo, tipo]);
+                return interaction.message.edit({ components: [] }).catch((error) => {
+                    console.error('[Interaction] Falha ao encerrar confirmação militar:', error);
+                });
             }
             if (acao === 'cancelar' && interaction.isButton()) {
                 const paises = (db.get('lista_paises') || []).filter(
@@ -271,6 +274,19 @@ client.on('interactionCreate', async (interaction) => {
         }
     } catch (e) {
         console.error('[ButtonHandler]', e);
+        const resposta = {
+            content: '❌ Não foi possível concluir esta ação. O estado do mundo não foi confirmado.',
+            ephemeral: true
+        };
+        if (interaction.deferred || interaction.replied) {
+            await interaction.followUp(resposta).catch((followUpError) => {
+                console.error('[ButtonHandler] Falha ao enviar erro da interaction:', followUpError);
+            });
+        } else {
+            await interaction.reply(resposta).catch((replyError) => {
+                console.error('[ButtonHandler] Falha ao responder interaction:', replyError);
+            });
+        }
     }
 });
 

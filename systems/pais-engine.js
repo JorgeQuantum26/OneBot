@@ -5,6 +5,7 @@ const { criarProposta, enviarPropostaComBotao, TIPOS_PROPOSTA } = require('./pro
 const { TECNOLOGIAS } = require('../commands/pesquisa');
 const { balancearPaises } = require('./pais-balance');
 const { criarGuerra, registrarBatalha, calcularPontuacao } = require('./guerra-state');
+const { reduzirPopulacao, aumentarPopulacao } = require('./pais-mutacoes');
 // 🦠 DOENÇAS E EVENTOS DE SAÚDE
 const DOENCAS = {
     gripe_comum: {
@@ -197,7 +198,7 @@ const FUNCOES_MINISTERIO = {
             if (!min || !min.ativo) return null;
             const nivel = min.nivel || 1;
             const crescimento = Math.floor((pais.populacao || 0) * (0.001 * nivel));
-            db.add(`pais_${nomePais}.populacao`, crescimento);
+            aumentarPopulacao(nomePais, crescimento);
             return `👶 +${crescimento} habitantes`;
         }
     },
@@ -703,7 +704,7 @@ class PaisEngine {
         }
 
         const crescPop = Math.floor(populacao * (inflacao < 0.05 ? 0.002 : 0.0005));
-        if (crescPop > 0) db.add(`pais_${nomePais}.populacao`, crescPop);
+        if (crescPop > 0) aumentarPopulacao(nomePais, crescPop);
     }
 
     processarExercito(nomePais, pais) {
@@ -957,7 +958,7 @@ class PaisEngine {
                 break;
             case 'crescimento':
                 if (tesouro > 5000 && Math.random() < 0.25) {
-                    db.add(`pais_${nomePais}.populacao`, Math.floor((pais.populacao || 0) * 0.002));
+                    aumentarPopulacao(nomePais, Math.floor((pais.populacao || 0) * 0.002));
                     db.subtract(`pais_${nomePais}.tesouro`, 1000);
                 }
                 break;
@@ -1791,7 +1792,7 @@ class PaisEngine {
         } else {
             // Revolta suprimida
             db.set(`pais_${nomePais}.tensaoColonial`, Math.max(0, (pais.tensaoColonial || 80) - 40));
-            db.subtract(`pais_${nomePais}.populacao`, Math.floor((pais.populacao || 0) * 0.03));
+            reduzirPopulacao(nomePais, Math.floor((pais.populacao || 0) * 0.03));
             db.subtract(`pais_${nomePais}.exercito.infantaria`, Math.floor((exercitoFantoche.infantaria || 0) * 0.3));
 
             const noticia = {
@@ -2027,7 +2028,7 @@ class PaisEngine {
             const mortes = Math.floor(populacaoAfetada * 0.3);
             const feridos = populacaoAfetada - mortes;
 
-            db.subtract(`pais_${nomePais}.populacao`, mortes);
+            reduzirPopulacao(nomePais, mortes);
             db.subtract(`pais_${nomePais}.reputacaoDiplomatica`, 30);
             db.subtract(`pais_${nomePais}.construcoes.usina_nuclear.nivel`, 1);
             db.subtract(`pais_${nomePais}.aprovacaoPopular`, 20);
@@ -2291,7 +2292,7 @@ class PaisEngine {
             hospitaisSobrecarregados = false;
         }
 
-        db.subtract(`pais_${nomePais}.populacao`, mortos + evacuados);
+        reduzirPopulacao(nomePais, mortos + evacuados);
         db.subtract(`pais_${nomePais}.tesouro`, custoLimpeza);
         db.subtract(`pais_${nomePais}.reputacaoDiplomatica`, danoReputacao);
         db.subtract(`pais_${nomePais}.infraestrutura`, danoInfra);
@@ -2499,7 +2500,7 @@ class PaisEngine {
 
             const mortos = Math.floor(falta * 0.1);
             if (mortos > 0) {
-                db.subtract(`pais_${nomePais}.populacao`, mortos);
+                reduzirPopulacao(nomePais, mortos);
                 db.subtract(`pais_${nomePais}.aprovacaoPopular`, 5);
 
                 if (mortos > populacao * 0.001) {
@@ -2565,7 +2566,7 @@ class PaisEngine {
         if (deficitLeitos > 0) {
             // Mortes por falta de atendimento
             const mortesAdicionais = Math.floor(deficitLeitos * 0.3); // 30% dos sem leito morrem
-            db.subtract(`pais_${nomePais}.populacao`, mortesAdicionais);
+            reduzirPopulacao(nomePais, mortesAdicionais);
             db.subtract(`pais_${nomePais}.aprovacaoPopular`, 10);
 
             const noticiaHospital = {
@@ -2707,7 +2708,7 @@ class PaisEngine {
         const obitosFinais = Math.floor(obitosNaturais * (1 - reducaoHospitais));
 
         if (obitosFinais > 0) {
-            db.subtract(`pais_${nomePais}.populacao`, obitosFinais);
+            reduzirPopulacao(nomePais, obitosFinais);
             db.set(`pais_${nomePais}.obitos_ciclo`, obitosFinais);
         }
 
@@ -2773,7 +2774,7 @@ class PaisEngine {
             // Mortes pela doença
             const mortesDoenca = Math.floor(novosInfectados * doenca.mortalidade);
             if (mortesDoenca > 0) {
-                db.subtract(`pais_${nomePais}.populacao`, mortesDoenca);
+                reduzirPopulacao(nomePais, mortesDoenca);
                 db.subtract(`pais_${nomePais}.doentes_ativos`, mortesDoenca);
             }
 
@@ -3032,7 +3033,7 @@ class PaisEngine {
                     const poder = tipo === 'ogiva_hidrogenio' ? 100 : tipo === 'ogiva_avancada' ? 10 : 1;
                     const mortos = Math.floor((paisInimigo.populacao || 0) * 0.05 * poder);
                     db.subtract(`pais_${nomePais}.arsenal_nuclear.${tipo}`, 1);
-                    db.subtract(`pais_${inimigo}.populacao`, mortos);
+                    reduzirPopulacao(inimigo, mortos);
                     db.subtract(`pais_${inimigo}.infraestrutura`, Math.min(5, poder * 0.5));
                     db.subtract(`pais_${nomePais}.reputacaoDiplomatica`, 50);
                     const noticia = {
@@ -3522,7 +3523,7 @@ class PaisEngine {
 
             // ⚡ MARCAR COMO INTEGRADO
             db.set(`pais_${nomePais}.status`, 'integrado');
-            db.set(`pais_${nomePais}.populacao`, Math.floor((pais.populacao || 0) * 0.4)); // 40% fica
+            db.set(`pais_${nomePais}.populacao`, Math.max(0, Math.floor((pais.populacao || 0) * 0.4))); // 40% fica
             db.set(`pais_${nomePais}.tesouro`, 0);
             db.set(`pais_${nomePais}.exercito.infantaria`, 0);
             db.set(`pais_${nomePais}.exercito.tanques`, 0);
@@ -3555,7 +3556,7 @@ class PaisEngine {
             // ⚠️ CHANCE DE REVOLTA (10%)
             if (Math.random() < 0.1) {
                 const revoltosos = Math.floor((pais.populacao || 0) * 0.1);
-                db.subtract(`pais_${anexadoPor}.populacao`, revoltosos);
+                reduzirPopulacao(anexadoPor, revoltosos);
                 db.subtract(`pais_${anexadoPor}.aprovacaoPopular`, 5);
 
                 const noticiaRevolta = {

@@ -1,6 +1,7 @@
 const Discord = require('discord.js');
 const db = require('../systems/rpg-db');
 const { getDadosPais } = require('../systems/real-countries-data');
+const { reduzirPopulacao } = require('../systems/pais-mutacoes');
 
 const NUCLEAR_DATA = {
     uranio_por_ogiva: 100,
@@ -294,7 +295,10 @@ exports.run = async (client, message, args) => {
             return message.channel.send('❌ Pesquise **Enriquecimento de Urânio** primeiro!');
         }
 
-        const qtd = parseInt(args[1]) || 100;
+        const qtd = args[1] === undefined ? 100 : parseInt(args[1], 10);
+        if (!Number.isInteger(qtd) || qtd <= 0) {
+            return message.channel.send('❌ A quantidade de urânio deve ser um número inteiro positivo.');
+        }
         const uranioBruto = Number(pais.uranio) || 0;
         const custoDinheiro = Math.floor(NUCLEAR_DATA.custo_enriquecimento * (qtd / 100) * fatorInflacao);
         const tesouro = Number(pais.tesouro) || 0;
@@ -326,7 +330,7 @@ exports.run = async (client, message, args) => {
 
         if (Math.random() < NUCLEAR_DATA.chance_vazamento) {
             const populacaoAfetada = Math.floor((pais.populacao || 0) * 0.001);
-            db.subtract(`pais_${nomePais}.populacao`, populacaoAfetada);
+            reduzirPopulacao(nomePais, populacaoAfetada);
             db.subtract(`pais_${nomePais}.reputacaoDiplomatica`, 5);
 
             const embed = new Discord.EmbedBuilder()

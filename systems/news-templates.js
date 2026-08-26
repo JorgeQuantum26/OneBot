@@ -1,4 +1,5 @@
 const db = require('./rpg-db');
+const { reduzirPopulacao } = require('./pais-mutacoes');
 
 // ================= 🌋 DESASTRES NATURAIS POR REGIÃO (15 eventos) =================
 const desastresPorRegiao = {
@@ -8,7 +9,7 @@ const desastresPorRegiao = {
             desc: 'Ondas de {valor}m atingiram o litoral. {valor2}% da população costeira afetada. Milhares de desaparecidos.',
             efeito: (p) => {
                 const pop = db.get(`pais_${p}.populacao`) || 0;
-                db.subtract(`pais_${p}.populacao`, Math.floor(pop * 0.04));
+                reduzirPopulacao(p, Math.floor(pop * 0.04));
                 db.subtract(`pais_${p}.infraestrutura`, 1.5);
             }
         },
@@ -25,7 +26,7 @@ const desastresPorRegiao = {
             desc: 'Prédios desabaram, {valor2}% da infraestrutura destruída. Equipes de resgate trabalham sem parar.',
             efeito: (p) => {
                 db.subtract(`pais_${p}.infraestrutura`, 1);
-                db.subtract(`pais_${p}.populacao`, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.02));
+                reduzirPopulacao(p, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.02));
             }
         },
         {
@@ -43,7 +44,7 @@ const desastresPorRegiao = {
             desc: 'Ventos de {valor}km/h destruíram o litoral. Evacuações em massa, {valor2}% da infraestrutura perdida.',
             efeito: (p) => {
                 db.subtract(`pais_${p}.infraestrutura`, Math.floor((db.get(`pais_${p}.infraestrutura`) || 0) * 0.25));
-                db.subtract(`pais_${p}.populacao`, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.015));
+                reduzirPopulacao(p, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.015));
             }
         },
         {
@@ -59,14 +60,14 @@ const desastresPorRegiao = {
             desc: 'Tornado de categoria F{valor} arrasou cidades inteiras em minutos. Centenas de desaparecidos.',
             efeito: (p) => {
                 db.subtract(`pais_${p}.infraestrutura`, 0.5);
-                db.subtract(`pais_${p}.populacao`, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.005));
+                reduzirPopulacao(p, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.005));
             }
         },
         {
             titulo: '🏔️ Avalanche mortal em {pais}!',
             desc: 'Avalanche soterrou vilarejo alpino. Equipes de resgate enfrentam dificuldades.',
             efeito: (p) => {
-                db.subtract(`pais_${p}.populacao`, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.002));
+                reduzirPopulacao(p, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.002));
             }
         }
     ],
@@ -76,7 +77,7 @@ const desastresPorRegiao = {
             desc: '{valor}°C! Idosos em risco, colheitas perdidas, {valor2}% da produção agrícola destruída.',
             efeito: (p) => {
                 db.subtract(`pais_${p}.comida`, Math.floor((db.get(`pais_${p}.comida`) || 0) * 0.1));
-                db.subtract(`pais_${p}.populacao`, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.003));
+                reduzirPopulacao(p, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.003));
             }
         },
         {
@@ -320,7 +321,7 @@ const eventosSaude = [
         desc: 'Superlotação total! Pacientes nos corredores, faltam médicos e remédios.',
         efeito: (p) => {
             db.subtract(`pais_${p}.aprovacaoPopular`, 15);
-            db.subtract(`pais_${p}.populacao`, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.01));
+            reduzirPopulacao(p, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.01));
         }
     },
     {
@@ -377,7 +378,7 @@ const eventosMilitares = [
                 Math.floor((db.get(`pais_${p}.exercito.infantaria`) || 0) * 0.1)
             );
             db.subtract(`pais_${p}.infraestrutura`, 0.8);
-            db.subtract(`pais_${p}.populacao`, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.01));
+            reduzirPopulacao(p, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.01));
         }
     },
     {
@@ -417,7 +418,7 @@ const eventosMilitares = [
         titulo: '💣 Atentado terrorista em {pais}!',
         desc: 'Explosões abalam capital! Dezenas de mortos, pânico generalizado.',
         efeito: (p) => {
-            db.subtract(`pais_${p}.populacao`, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.003));
+            reduzirPopulacao(p, Math.floor((db.get(`pais_${p}.populacao`) || 0) * 0.003));
             db.subtract(`pais_${p}.aprovacaoPopular`, 10);
         }
     },
