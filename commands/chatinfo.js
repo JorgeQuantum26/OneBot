@@ -1,0 +1,2 @@
+const { EmbedBuilder } = require('discord.js');
+exports.run = async (client, message) => { const channel = message.mentions.channels.first() || message.channel; return message.channel.send({ embeds: [new EmbedBuilder().setTitle(`💭 ${channel.name}`).addFields({ name: 'ID', value: channel.id, inline: true }, { name: 'Tipo', value: channel.type, inline: true }, { name: 'Criado em', value: channel.createdAt.toISOString(), inline: false })] }); };

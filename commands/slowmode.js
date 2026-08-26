@@ -1,0 +1,53 @@
+const { EmbedBuilder } = require('discord.js');
+const ms = require('ms');
+
+module.exports = {
+    name: 'slowmode',
+    run: async (client, message, args) => {
+
+        if(message.guild.me.hasPermission("MANAGE_CHANNELS"))
+    return message.channel.send({embed: {
+      title: "Erro ao executar este comando!",
+      description: `:x:| Eu não tenho a permissão de **Gerenciar_Canais** Para executar este comando`,
+      color: "RANDOM"
+    }})
+
+
+        if (!message.member.hasPermission('MANAGE_CHANNELS')) return message.channel.send('<a:X_Icon:806588437049638992>Você não tem permissão para usar este comando.').then(m => m.delete({ timeout: 5000 }));
+
+        if (!args[0]) return message.channel.send('<a:X_Icon:806588437049638992>| Coloque o tempo para o slowmode!').then(m => m.delete({ timeout: 5000}));
+
+        const currentCooldown = message.channel.rateLimitPerUser;
+
+        const reason = args[1] ? args.slice(1).join(' ') : 'Razão Não Informada';
+
+        const embed = new EmbedBuilder()
+            .setFooter({ text: { text: `${message.author.tag} | ${message.author.id}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) } });
+
+        if (args[0] === 'off') {
+
+            if (currentCooldown === 0) return message.channel.send('slowmode do canal está desativado.').then(m => m.delete({ timeout: 5000 }));
+
+            embed.setTitle('Slowmode Desativado.')
+                .setColor('#00ff00')
+            return message.channel.setRateLimitPerUser(0, reason)
+
+        }
+
+        const time = ms(args[0]) / 1000;
+
+        if (isNaN(time)) return message.channel.send('<a:X_Icon:806588437049638992>|Tempo invalido!').then(m => m.delete({ timeout: 5000 }));
+
+        if (time >= 21600) return message.channel.send('<a:X_Icon:806588437049638992>|Esse limite de modo lento é muito alto, digite qualquer coisa menor que 6 horas.').then(m => m.delete({ timeout: 5000 }));
+
+        if (currentCooldown === time) return message.channel.send(`<a:X_Icon:806588437049638992>| O Slowmode já está definido para ${args[0]}`);
+
+        embed.setTitle('<a:VerificadoVerdeIcon:806590288424468520>| O Slowmode Foi Ativado')
+            .addFields({ name: 'Slowmode: ', value: args[0], inline: false })
+            .addFields({ name: 'Razão: ', value: reason, inline: false })
+            .setColor('#ff0000');
+
+        message.channel.setRateLimitPerUser(time, reason).then(m => m.send({ embeds: [embed] }));
+
+    }
+}

@@ -1,0 +1,2 @@
+const { EmbedBuilder } = require('discord.js');
+exports.run = async (client, message) => { const guild = message.guild; const bots = guild.members.cache.filter(member => member.user.bot).size; return message.channel.send({ embeds: [new EmbedBuilder().setTitle(`${guild.name} • Informações`).addFields({ name: 'ID', value: guild.id, inline: true }, { name: 'Membros', value: String(guild.memberCount), inline: true }, { name: 'Bots', value: String(bots), inline: true }, { name: 'Canais', value: String(guild.channels.cache.size), inline: true })] }); };

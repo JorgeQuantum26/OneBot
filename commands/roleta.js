@@ -1,0 +1,2 @@
+const db = require('../systems/firestore');
+exports.run = async (client, message, args) => { const aposta = Number(args[0]) || 0; if (aposta <= 0) return message.channel.send('Informe uma aposta válida.'); const ganhou = Math.random() >= 0.5; if (ganhou) db.add(`money_${message.guild.id}_${message.author.id}`, aposta); return message.channel.send(ganhou ? `🎰 Você ganhou ${aposta.toLocaleString('pt-BR')} moedas!` : '🎰 Você perdeu a aposta.'); };

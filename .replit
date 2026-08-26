@@ -1,0 +1,175 @@
+entrypoint = "index.js"
+
+hidden = [".config"]
+modules = ["nodejs-20", "python-3.11"]
+
+[interpreter]
+command = [
+    "prybar-nodejs",
+    "-q",
+    "--ps1",
+    "\u0001\u001b[33m\u0002\u0001\u001b[00m\u0002 ",
+    "-i"
+]
+
+[[hints]]
+regex = "Error \\[ERR_REQUIRE_ESM\\]"
+message = "We see that you are using require(...) inside your code. We currently do not support this syntax. Please use 'import' instead when using external modules. (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import)"
+
+[nix]
+channel = "stable-21_11"
+
+[env]
+PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
+XDG_CONFIG_HOME = "/home/runner/.config"
+npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", ".config"]
+
+[packager]
+language = "nodejs"
+
+  [packager.features]
+  packageSearch = true
+  guessImports = true
+  enabledForHosting = false
+
+[unitTest]
+language = "nodejs"
+
+[languages.javascript]
+pattern = "**/{*.js,*.jsx,*.ts,*.tsx}"
+
+  [languages.javascript.languageServer]
+start = "typescript-language-server --stdio"
+
+[debugger]
+support = true
+
+  [debugger.interactive]
+  transport = "localhost:0"
+  startCommand = [ "dap-node" ]
+
+    [debugger.interactive.initializeMessage]
+    command = "initialize"
+    type = "request"
+
+      [debugger.interactive.initializeMessage.arguments]
+      clientID = "replit"
+      clientName = "replit.com"
+      columnsStartAt1 = true
+      linesStartAt1 = true
+      locale = "en-us"
+      pathFormat = "path"
+      supportsInvalidatedEvent = true
+      supportsProgressReporting = true
+      supportsRunInTerminalRequest = true
+      supportsVariablePaging = true
+      supportsVariableType = true
+
+    [debugger.interactive.launchMessage]
+    command = "launch"
+    type = "request"
+    
+      [debugger.interactive.launchMessage.arguments]  
+      args = []
+      console = "externalTerminal"
+      cwd = "."
+      environment = []
+      pauseForSourceMap = false
+      program = "./index.js"
+      request = "launch"
+      sourceMaps = true
+      stopOnEntry = false
+      type = "pwa-node"
+
+[[ports]]
+localPort = 33823
+externalPort = 4200
+
+[[ports]]
+localPort = 35161
+externalPort = 80
+
+[[ports]]
+localPort = 36411
+externalPort = 5000
+
+[[ports]]
+localPort = 37195
+externalPort = 8000
+
+[[ports]]
+localPort = 37345
+externalPort = 8099
+
+[[ports]]
+localPort = 38065
+externalPort = 3001
+
+[[ports]]
+localPort = 38855
+externalPort = 3002
+
+[[ports]]
+localPort = 39023
+externalPort = 8080
+
+[[ports]]
+localPort = 39987
+externalPort = 5173
+
+[[ports]]
+localPort = 40453
+externalPort = 6800
+
+[[ports]]
+localPort = 40753
+externalPort = 9000
+
+[[ports]]
+localPort = 41641
+externalPort = 3003
+
+[[ports]]
+localPort = 42673
+externalPort = 8008
+
+[[ports]]
+localPort = 42817
+externalPort = 8081
+
+[[ports]]
+localPort = 44243
+externalPort = 3000
+
+[[ports]]
+localPort = 44883
+externalPort = 6000
+
+[agent]
+expertMode = true
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
