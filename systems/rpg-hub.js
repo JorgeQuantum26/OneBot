@@ -134,6 +134,7 @@ function renderizar(nomePais, secao = 'visao') {
  * Interceptador de clique síncrono do index.js
  */
 async function handleButton(interaction, userId) {
+    console.log('[HANDLER ENTER]', 'rpg_hub', `interactionId=${interaction.id}`, `customId=${interaction.customId}`);
     // rpg_hub:secao:nomePais
     const partes = interaction.customId.split(':');
     const secao = partes[1];
@@ -143,19 +144,23 @@ async function handleButton(interaction, userId) {
     const paisDoJogador = (db.get(`${userId}.pais`) || '').toLowerCase();
 
     if (paisDoJogador !== nomePais?.toLowerCase()) {
-        return interaction.reply({ content: '❌ Este painel não pertence ao seu país atual.', ephemeral: true });
+        return interaction.followUp({ content: '❌ Este painel não pertence ao seu país atual.', ephemeral: true });
     }
 
+    console.log('[BUSINESS LOGIC START]', 'rpg_hub', `secao=${secao}`, `pais=${nomePais}`);
+    console.log('[RENDER START]', 'rpg_hub', `secao=${secao}`);
     const containerV2 = renderizar(nomePais, secao);
     if (!containerV2) {
-        return interaction.reply({
+        return interaction.followUp({
             content: '❌ O estado do país não pôde ser processado na memória.',
             ephemeral: true
         });
     }
 
     // Atualiza a mensagem utilizando estritamente a nova engine V2 (enviando via array de components)
-    return interaction.update({ components: [containerV2], flags: MessageFlags.IsComponentsV2 });
+    const resultado = await interaction.editReply({ components: [containerV2] });
+    console.log('[UPDATE/EDIT SUCCESS]', 'rpg_hub', `interactionId=${interaction.id}`);
+    return resultado;
 }
 
 module.exports = { criarBotoes, renderizar, handleButton };

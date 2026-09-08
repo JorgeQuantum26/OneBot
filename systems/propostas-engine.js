@@ -110,7 +110,7 @@ async function handlePropostaButton(client, interaction) {
     // ⚡ Pega nome original
     const nomePaisOriginal = db.get(`${userId}.pais`);
     if (!nomePaisOriginal) {
-        return interaction.reply({ content: '❌ Você não governa nenhum país!', ephemeral: true });
+        return interaction.followUp({ content: '❌ Você não governa nenhum país!', ephemeral: true });
     }
     const nomePais = nomePaisOriginal.toLowerCase();
     
@@ -119,7 +119,7 @@ async function handlePropostaButton(client, interaction) {
     
     const pais = db.get(`pais_${nomePaisOriginal}`) || db.get(`pais_${nomePais}`);
     if (!pais || pais.governador !== userId) {
-        return interaction.reply({ content: '❌ Você não é o governador deste país!', ephemeral: true });
+        return interaction.followUp({ content: '❌ Você não é o governador deste país!', ephemeral: true });
     }
 
     // ⚡ Busca case-insensitive
@@ -132,20 +132,20 @@ async function handlePropostaButton(client, interaction) {
          p.para?.toLowerCase() === nomePais)
     );
     
-    if (idx === -1) return interaction.reply({ content: '❌ Proposta não encontrada ou já respondida!', ephemeral: true });
+    if (idx === -1) return interaction.followUp({ content: '❌ Proposta não encontrada ou já respondida!', ephemeral: true });
 
     const proposta = propostas[idx];
     
     if (proposta.expiraEm < Date.now()) {
         propostas[idx].status = 'expirada';
         db.set(`propostas_${nomePaisOriginal}`, propostas);
-        return interaction.reply({ content: '⏰ Esta proposta expirou!', ephemeral: true });
+        return interaction.followUp({ content: '⏰ Esta proposta expirou!', ephemeral: true });
     }
     
     // ⚡ Validação case-insensitive
     if ((proposta.destinatario?.toLowerCase() !== nomePais) && 
         (proposta.para?.toLowerCase() !== nomePais)) {
-        return interaction.reply({ content: '❌ Esta proposta não é para o seu país!', ephemeral: true });
+        return interaction.followUp({ content: '❌ Esta proposta não é para o seu país!', ephemeral: true });
     }
 
     const Discord = require('discord.js');
@@ -174,7 +174,7 @@ async function handlePropostaButton(client, interaction) {
         }
 
         await interaction.message.edit({ embeds: [embed], components: [] }).catch(() => {});
-        return interaction.reply({ content: '✅ Você aceitou a proposta! O acordo foi firmado.', ephemeral: true });
+        return interaction.followUp({ content: '✅ Você aceitou a proposta! O acordo foi firmado.', ephemeral: true });
     }
 
     if (isRecusar) {
@@ -187,7 +187,7 @@ async function handlePropostaButton(client, interaction) {
             .setColor('#e74c3c').setTimestamp();
 
         await interaction.message.edit({ embeds: [embed], components: [] }).catch(() => {});
-        return interaction.reply({ content: '❌ Proposta recusada.', ephemeral: true });
+        return interaction.followUp({ content: '❌ Proposta recusada.', ephemeral: true });
     }
     return true;
 }

@@ -60,21 +60,50 @@ client.interaction = {};
 const DiscordButtons = Discord;
 
 client.on('interactionCreate', async (interaction) => {
+    const interactionReceivedAt = Date.now();
+    const interactionCustomId = interaction.customId || '';
+    const isRpgInteraction =
+        interactionCustomId.startsWith('rpg_') ||
+        interactionCustomId.startsWith('aceitar_') ||
+        interactionCustomId.startsWith('recusar_') ||
+        interactionCustomId.startsWith('imposto_') ||
+        interactionCustomId.startsWith('rec_') ||
+        interactionCustomId.startsWith('minfunc_');
+    console.log(
+        '[INTERACTION RECEIVED]',
+        `id=${interaction.id}`,
+        `type=${interaction.type}`,
+        `customId=${interactionCustomId || '(none)'}`,
+        `button=${interaction.isButton()}`,
+        `select=${interaction.isStringSelectMenu()}`,
+        `modal=${interaction.isModalSubmit()}`,
+        `user=${interaction.user?.id || '(none)'}`,
+        `guild=${interaction.guildId || '(none)'}`,
+        `channel=${interaction.channelId || '(none)'}`
+    );
     if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
-    const id = interaction.customId || '';
+    const id = interactionCustomId;
     const userId = interaction.user.id;
 
     try {
+        console.log('[ROUTER ENTER]', `id=${interaction.id}`, `customId=${id}`);
+        if (isRpgInteraction && !interaction.replied && !interaction.deferred) {
+            console.log('[ACK START]', `id=${interaction.id}`, `customId=${id}`);
+            await interaction.deferUpdate();
+            console.log('[ACK SUCCESS]', `id=${interaction.id}`, `ms=${Date.now() - interactionReceivedAt}`);
+        }
+        console.log('[ROUTE CHECK]', `customId="${id}"`);
         if (id.startsWith('rpg_operacao:')) {
+            console.log('[ROUTE MATCHED]', 'rpg_operacao');
             const partes = id.split(':');
             const acao = partes[1];
             const nomePais = String(db.get(`${userId}.pais`) || '').toLowerCase();
             if (!nomePais || nomePais !== String(partes[2] || '').toLowerCase()) {
-                return interaction.reply({ content: '❌ Esta operação não pertence ao seu país.', ephemeral: true });
+                    return interaction.followUp({ content: '❌ Esta operação não pertence ao seu país.', ephemeral: true });
             }
             const pais = db.get(`pais_${nomePais}`);
             if (!pais || pais.governador !== userId) {
-                return interaction.reply({
+                return interaction.followUp({
                     content: '❌ Apenas o governador pode comandar operações.',
                     ephemeral: true
                 });
@@ -83,21 +112,24 @@ client.on('interactionCreate', async (interaction) => {
             if (acao === 'alvo' && interaction.isStringSelectMenu()) {
                 const alvo = interaction.values[0];
                 const paisAlvo = db.get(`pais_${alvo}`);
-                if (!paisAlvo) return interaction.reply({ content: '❌ País-alvo indisponível.', ephemeral: true });
-                return interaction.update(operacao.criarSelecaoOperacao(nomePais, alvo, pais));
+                if (!paisAlvo) return interaction.followUp({ content: '❌ País-alvo indisponível.', ephemeral: true });
+                console.log('[HANDLER ENTER]', 'operacao:alvo');
+                const resultado = await interaction.editReply(operacao.criarSelecaoOperacao(nomePais, alvo, pais));
+                console.log('[UPDATE/EDIT SUCCESS]', 'operacao:alvo', `ms=${Date.now() - interactionReceivedAt}`);
+                return resultado;
             }
             if (acao === 'tipo' && interaction.isStringSelectMenu()) {
                 const alvo = partes[3];
                 const tipo = interaction.values[0];
                 const paisAlvo = db.get(`pais_${alvo}`);
                 if (!paisAlvo)
-                    return interaction.reply({ content: '❌ Teatro de operações indisponível.', ephemeral: true });
-                return interaction.update(operacao.criarConfirmacaoOperacao(nomePais, alvo, tipo, pais, paisAlvo));
+                    return interaction.followUp({ content: '❌ Teatro de operações indisponível.', ephemeral: true });
+                console.log('[HANDLER ENTER]', 'operacao:tipo');
+                return interaction.editReply(operacao.criarConfirmacaoOperacao(nomePais, alvo, tipo, pais, paisAlvo));
             }
             if (acao === 'confirmar' && interaction.isButton()) {
                 const alvo = partes[3];
                 const tipo = partes[4];
-                await interaction.deferUpdate();
                 const mensagemVirtual = {
                     author: interaction.user,
                     channel: { send: (payload) => interaction.followUp(payload) }
@@ -111,25 +143,29 @@ client.on('interactionCreate', async (interaction) => {
                 const paises = (db.get('lista_paises') || []).filter(
                     (paisDisponivel) => paisDisponivel !== nomePais && db.get(`pais_${paisDisponivel}`)
                 );
-                return interaction.update(operacao.criarPainelOperacao(nomePais, pais, paises));
+                return interaction.editReply(operacao.criarPainelOperacao(nomePais, pais, paises));
             }
-            return interaction.reply({ content: '❌ Ação de operação inválida.', ephemeral: true });
+            return interaction.followUp({ content: '❌ Ação de operação inválida.', ephemeral: true });
         }
 
         if (id.startsWith('rpg_hub:')) {
+            console.log('[ROUTE MATCHED]', 'rpg_hub');
             const { handleButton } = require('./systems/rpg-hub');
+            console.log('[HANDLER ENTER]', 'rpg_hub');
             await handleButton(interaction, userId);
+            console.log('[UPDATE/EDIT SUCCESS]', 'rpg_hub', `ms=${Date.now() - interactionReceivedAt}`);
             return;
         }
 
         if (id.startsWith('rpg_diplomacia:')) {
+            console.log('[ROUTE MATCHED]', 'rpg_diplomacia');
             const [, acao, nomePaisId, propostaId] = id.split(':');
             const nomePais = String(db.get(`${userId}.pais`) || '').toLowerCase();
             if (!nomePais || nomePais !== String(nomePaisId || '').toLowerCase())
-                return interaction.reply({ content: '❌ Este painel não pertence ao seu país.', ephemeral: true });
+                return interaction.followUp({ content: '❌ Este painel não pertence ao seu país.', ephemeral: true });
             const pais = db.get(`pais_${nomePais}`);
             if (!pais || pais.governador !== userId) {
-                return interaction.reply({ content: '❌ Apenas o governador pode usar este painel.', ephemeral: true });
+                return interaction.followUp({ content: '❌ Apenas o governador pode usar este painel.', ephemeral: true });
             }
             const propostas = (db.get(`propostas_${nomePais}`) || []).filter(
                 (proposta) => proposta.status === 'pendente' && Number(proposta.expiraEm) > Date.now()
@@ -138,37 +174,33 @@ client.on('interactionCreate', async (interaction) => {
             if (acao === 'ver') {
                 const proposta = propostas.find((item) => item.id === propostaId);
                 if (!proposta)
-                    return interaction.reply({
+                    return interaction.followUp({
                         content: '❌ Proposta inexistente, expirada ou já respondida.',
                         ephemeral: true
                     });
-                return interaction.update({
-                    ...painel.renderizarDetalheProposta(nomePais, proposta),
-                    flags: MessageFlags.IsComponentsV2
-                });
+                return interaction.editReply(painel.renderizarDetalheProposta(nomePais, proposta));
             }
-            return interaction.update({
-                ...painel.criarPainelInterativo(nomePais, pais, propostas),
-                flags: MessageFlags.IsComponentsV2
-            });
+            return interaction.editReply(painel.criarPainelInterativo(nomePais, pais, propostas));
         }
 
         if (id.startsWith('aceitar_') || id.startsWith('recusar_')) {
+            console.log('[ROUTE MATCHED]', 'propostas');
             const { handlePropostaButton } = require('./systems/propostas-engine');
             await handlePropostaButton(client, interaction);
             return;
         }
 
         if (id.startsWith('imposto_')) {
+            console.log('[ROUTE MATCHED]', 'imposto');
             const partes = id.split('_');
             const taxa = parseInt(partes[1]);
             const nomePais = partes.slice(2).join('_');
             const nomePaisUser = (db.get(`${userId}.pais`) || '').toLowerCase();
             if (nomePaisUser !== nomePais)
-                return interaction.reply({ content: '❌ Este botão não é para o seu país!', ephemeral: true });
+                return interaction.followUp({ content: '❌ Este botão não é para o seu país!', ephemeral: true });
             const pais = db.get(`pais_${nomePais}`);
             if (!pais || pais.governador !== userId)
-                return interaction.reply({ content: '❌ Apenas o governador pode alterar impostos!', ephemeral: true });
+                return interaction.followUp({ content: '❌ Apenas o governador pode alterar impostos!', ephemeral: true });
             const anterior = ((pais.taxaImposto || 0.1) * 100).toFixed(1);
             db.set(`pais_${nomePais}.taxaImposto`, taxa / 100);
             const impacto = taxa > parseFloat(anterior) ? -3 : +2;
@@ -184,7 +216,7 @@ client.on('interactionCreate', async (interaction) => {
                     pais: nomePais
                 });
             return interaction
-                .reply({
+                .followUp({
                     content: `✅ Taxa de imposto definida em **${taxa}%**! Aprovação popular: ${impacto > 0 ? '+' : ''}${impacto}%`,
                     ephemeral: true
                 })
@@ -192,21 +224,22 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (id.startsWith('rec_')) {
+            console.log('[ROUTE MATCHED]', 'recrutamento');
             const partes = id.split('_');
             const tipo = partes[1];
             const qtd = parseInt(partes[2]);
             const nomePais = partes.slice(3).join('_');
             const nomePaisUser = (db.get(`${userId}.pais`) || '').toLowerCase();
             if (nomePaisUser !== nomePais)
-                return interaction.reply({ content: '❌ Este botão não é para o seu país!', ephemeral: true });
+                return interaction.followUp({ content: '❌ Este botão não é para o seu país!', ephemeral: true });
             const pais = db.get(`pais_${nomePais}`);
             if (!pais || pais.governador !== userId)
-                return interaction.reply({ content: '❌ Apenas o governador pode recrutar!', ephemeral: true });
+                return interaction.followUp({ content: '❌ Apenas o governador pode recrutar!', ephemeral: true });
             const CUSTOS = { infantaria: 10, tanques: 500, avioes: 2000, navios: 1500 };
             const MANUTENCAO = { infantaria: 0.05, tanques: 10, avioes: 40, navios: 30 };
             const custo = (CUSTOS[tipo] || 10) * qtd;
             if ((pais.tesouro || 0) < custo)
-                return interaction.reply({
+                return interaction.followUp({
                     content: `❌ Tesouro insuficiente! Custo: ${custo.toLocaleString('pt-BR')} moedas.`,
                     ephemeral: true
                 });
@@ -214,13 +247,14 @@ client.on('interactionCreate', async (interaction) => {
             db.subtract(`pais_${nomePais}.tesouro`, custo);
             db.add(`pais_${nomePais}.gastos`, custo);
             db.add(`pais_${nomePais}.exercito.manutencao`, qtd * (MANUTENCAO[tipo] || 1));
-            return interaction.reply({
+            return interaction.followUp({
                 content: `✅ **+${qtd} ${tipo}** recrutados! Custo: ${custo.toLocaleString('pt-BR')} moedas.`,
                 ephemeral: true
             });
         }
 
         if (id.startsWith('minfunc_')) {
+            console.log('[ROUTE MATCHED]', 'ministerio');
             const partes = id.split('_');
             const funcao = partes[1];
             const orcamento = parseInt(partes[2]);
@@ -229,18 +263,18 @@ client.on('interactionCreate', async (interaction) => {
             const nomeMin = decodeURIComponent(nomeEnc);
             const nomePaisUser = (db.get(`${userId}.pais`) || '').toLowerCase();
             if (nomePaisUser !== nomePais)
-                return interaction.reply({ content: '❌ Este botão não é para o seu país!', ephemeral: true });
+                return interaction.followUp({ content: '❌ Este botão não é para o seu país!', ephemeral: true });
             const pais = db.get(`pais_${nomePais}`);
             if (!pais || pais.governador !== userId)
-                return interaction.reply({
+                return interaction.followUp({
                     content: '❌ Apenas o governador pode criar ministérios!',
                     ephemeral: true
                 });
             const ministerios = pais.ministerios || {};
             if (ministerios[nomeMin])
-                return interaction.reply({ content: '❌ Já existe um ministério com esse nome!', ephemeral: true });
+                return interaction.followUp({ content: '❌ Já existe um ministério com esse nome!', ephemeral: true });
             if ((pais.tesouro || 0) < orcamento)
-                return interaction.reply({
+                return interaction.followUp({
                     content: `❌ Tesouro insuficiente! Custo: ${orcamento.toLocaleString('pt-BR')} moedas.`,
                     ephemeral: true
                 });
@@ -271,10 +305,17 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor('#2ecc71')
                 .setTimestamp();
             await interaction.message.edit({ embeds: [embed], components: [] }).catch(() => {});
-            return interaction.reply({ content: '✅ Ministério criado com sucesso!', ephemeral: true });
+            return interaction.followUp({ content: '✅ Ministério criado com sucesso!', ephemeral: true });
         }
+        console.warn('[ROUTE MISS]', `customId="${id}"`);
+        return interaction.followUp({ content: '❌ Interação RPG não reconhecida.', ephemeral: true });
     } catch (e) {
-        console.error('[ButtonHandler]', e);
+        console.error('[INTERACTION ERROR]', {
+            interactionId: interaction.id,
+            customId: interaction.customId,
+            message: e.message,
+            stack: e.stack
+        });
         const resposta = {
             content: '❌ Não foi possível concluir esta ação. O estado do mundo não foi confirmado.',
             ephemeral: true
