@@ -31,7 +31,7 @@ exports.run = async (client, message, args) => {
 
         const aplicarReputacao = (alvo, valor, motivo) => {
                 const atual = db.get(`pais_${alvo}.reputacaoDiplomatica`) || 50;
-                const nova = Math.max(0, Math.min(100, actual + valor));
+                const nova = Math.max(0, Math.min(100, atual + valor));
                 db.set(`pais_${alvo}.reputacaoDiplomatica`, nova);
 
                 const hist = db.get(`pais_${alvo}.historicoDiplomatico`) || [];
@@ -124,7 +124,7 @@ exports.run = async (client, message, args) => {
                                 .setAccentColor(0x2ecc71)
                                 .addTextDisplayComponents(displayConfirmacao);
 
-                        return message.channel.send({ components: [containerConfirmacao], flags: [MessageFlags.IsComponentsV2] });
+                        return message.channel.send({ components: [containerConfirmacao], flags: MessageFlags.IsComponentsV2 });
                 } catch (error) {
                         console.error('Erro ao enviar proposta:', error);
                         return message.channel.send('❌ Erro ao enviar proposta. Tente novamente.');
@@ -196,7 +196,7 @@ exports.run = async (client, message, args) => {
 
         if (!acao) {
                 const visualPanel = criarPainelInterativo(nomePais, pais, pendentes);
-                return message.channel.send({ components: [visualPanel], flags: [MessageFlags.IsComponentsV2] });
+                return message.channel.send({ components: [visualPanel], flags: MessageFlags.IsComponentsV2 });
         }
 
         const rep = pais.reputacaoDiplomatica || 50;
@@ -237,5 +237,61 @@ exports.run = async (client, message, args) => {
                 .setAccentColor(corEmbed)
                 .addTextDisplayComponents(embedText);
 
-        return message.channel.send({ components: [mainContainer], flags: [MessageFlags.IsComponentsV2] });
+        return message.channel.send({ components: [mainContainer], flags: MessageFlags.IsComponentsV2 });
 };
+
+function criarNavegacaoDiplomatica(nomePais, propostas) {
+        const row = new ActionRowBuilder()
+                .addComponents(
+                        new ButtonBuilder()
+                                .setCustomId(`rpg_diplomacia:atualizar:${nomePais}`)
+                                .setLabel('Atualizar')
+                                .setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder()
+                                .setCustomId(`rpg_hub:diplomacia:${nomePais}`)
+                                .setLabel('Voltar ao país')
+                                .setStyle(ButtonStyle.Secondary)
+                );
+        const proposta = propostas[0];
+        if (proposta) {
+                row.addComponents(
+                        new ButtonBuilder()
+                                .setCustomId(`rpg_diplomacia:ver:${nomePais}:${proposta.id}`)
+                                .setLabel('Ver proposta')
+                                .setStyle(ButtonStyle.Success)
+                );
+        }
+        return row;
+}
+
+function criarPainelInterativo(nomePais, pais, propostas) {
+        const rep = Number(pais.reputacaoDiplomatica) || 50;
+        const texto = new TextDisplayBuilder().setContent(
+                `## 🏛️ Painel Diplomático\n**${getDadosPais(nomePais)?.nomeFormal || nomePais}**\n\n` +
+                `🌍 Reputação: **${rep}/100**\n📬 Propostas pendentes: **${propostas.length}**\n` +
+                `🤝 Alianças: **${(pais.aliancas || []).length}**\n🚢 Rotas: **${(pais.rotasComerciais || []).length}**\n\n` +
+                'Use os controles abaixo para atualizar, voltar ao país ou abrir uma proposta.'
+        );
+        return new ContainerBuilder()
+                .setAccentColor(rep >= 50 ? 0x2ecc71 : 0xe67e22)
+                .addTextDisplayComponents(texto)
+                .addActionRowComponents(criarNavegacaoDiplomatica(nomePais, propostas));
+}
+
+function renderizarDetalheProposta(nomePais, proposta) {
+        const texto = new TextDisplayBuilder().setContent(
+                `## 📜 Proposta Diplomática\n**${proposta.tipo}**\n\n` +
+                `De: **${proposta.nomeRemetente || proposta.remetente}**\n` +
+                `Para: **${proposta.nomeDestinatario || proposta.destinatario}**\n` +
+                `ID: ${proposta.id}\n\n${proposta.termos?.descricao || 'Sem detalhes adicionais.'}`
+        );
+        const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`aceitar_${proposta.id}`).setLabel('Aceitar').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`recusar_${proposta.id}`).setLabel('Recusar').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId(`rpg_diplomacia:voltar:${nomePais}`).setLabel('Voltar').setStyle(ButtonStyle.Secondary)
+        );
+        return new ContainerBuilder().setAccentColor(0x3498db).addTextDisplayComponents(texto).addActionRowComponents(row);
+}
+
+module.exports.criarPainelInterativo = criarPainelInterativo;
+module.exports.renderizarDetalheProposta = renderizarDetalheProposta;

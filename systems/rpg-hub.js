@@ -155,10 +155,7 @@ async function handleButton(interaction, userId) {
     }
 
     // Atualiza a mensagem utilizando estritamente a nova engine V2 (enviando via array de components)
-    await interaction.message.edit({ components: [containerV2], flags: MessageFlags.IsComponentsV2 });
-
-    // Fecha a interação do Discord sem abrir janelas chatas de erro
-    return interaction.reply({ content: `✅ Painel mudado para: ${SECOES[secao]}`, ephemeral: true });
+    return interaction.update({ components: [containerV2], flags: MessageFlags.IsComponentsV2 });
 }
 
 module.exports = { criarBotoes, renderizar, handleButton };

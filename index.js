@@ -5,7 +5,7 @@ const path = require('path');
 const db = require('./systems/rpg-db');
 
 const Discord = require('discord.js'); //Conexão com a livraria Discord.js
-const { GatewayIntentBits, Partials, ActivityType } = Discord;
+const { GatewayIntentBits, Partials, ActivityType, MessageFlags } = Discord;
 const client = new Discord.Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -123,15 +123,10 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (id.startsWith('rpg_diplomacia:')) {
-            const [, acao, identificador] = id.split(':');
+            const [, acao, nomePaisId, propostaId] = id.split(':');
             const nomePais = String(db.get(`${userId}.pais`) || '').toLowerCase();
-            if (
-                !nomePais ||
-                nomePais !== String(acao === 'atualizar' || acao === 'voltar' ? identificador : nomePais).toLowerCase()
-            ) {
-                if (acao !== 'ver')
-                    return interaction.reply({ content: '❌ Este painel não pertence ao seu país.', ephemeral: true });
-            }
+            if (!nomePais || nomePais !== String(nomePaisId || '').toLowerCase())
+                return interaction.reply({ content: '❌ Este painel não pertence ao seu país.', ephemeral: true });
             const pais = db.get(`pais_${nomePais}`);
             if (!pais || pais.governador !== userId) {
                 return interaction.reply({ content: '❌ Apenas o governador pode usar este painel.', ephemeral: true });
@@ -141,15 +136,21 @@ client.on('interactionCreate', async (interaction) => {
             );
             const painel = require('./commands/painel-diplomatico');
             if (acao === 'ver') {
-                const proposta = propostas.find((item) => item.id === identificador);
+                const proposta = propostas.find((item) => item.id === propostaId);
                 if (!proposta)
                     return interaction.reply({
                         content: '❌ Proposta inexistente, expirada ou já respondida.',
                         ephemeral: true
                     });
-                return interaction.update(painel.renderizarDetalheProposta(nomePais, proposta));
+                return interaction.update({
+                    ...painel.renderizarDetalheProposta(nomePais, proposta),
+                    flags: MessageFlags.IsComponentsV2
+                });
             }
-            return interaction.update(painel.criarPainelInterativo(nomePais, pais, propostas));
+            return interaction.update({
+                ...painel.criarPainelInterativo(nomePais, pais, propostas),
+                flags: MessageFlags.IsComponentsV2
+            });
         }
 
         if (id.startsWith('aceitar_') || id.startsWith('recusar_')) {

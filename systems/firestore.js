@@ -3,7 +3,7 @@
 // ==========================================
 const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
-const { cert, initializeApp, getApps } = require('firebase-admin/app'); // 💡 Importação moderna e segura para as credenciais
+const { cert, applicationDefault, initializeApp, getApps } = require('firebase-admin/app'); // 💡 Importação moderna e segura para as credenciais
 const { isDeepStrictEqual } = require('node:util');
 const _ = require('lodash');
 
@@ -56,7 +56,7 @@ function parseServiceAccount(jsonString) {
 // 1. Inicializa o App Principal usando a sintaxe moderna do SDK
 const saPrincipal = parseServiceAccount(process.env.FIREBASE_SERVICE_ACCOUNT);
 const appPrincipal = initializeApp({
-    credential: saPrincipal ? cert(saPrincipal) : admin.credential.applicationDefault()
+    credential: saPrincipal ? cert(saPrincipal) : applicationDefault()
 }, 'principal');
 firestorePrincipal = getFirestore(appPrincipal);
 
