@@ -144,7 +144,11 @@ const db = {
         return usandoFallback;
     },
     get ready() {
-        return bancoOficial?.ready || Promise.resolve();
+        if (!bancoOficial?.ready) return Promise.resolve();
+        return bancoOficial.ready.catch((error) => {
+            ativarFallback(error);
+            return undefined;
+        });
     },
     async flush() {
         if (!bancoOficial?.flush) return undefined;

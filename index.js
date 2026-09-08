@@ -706,8 +706,13 @@ client.on('ready', () => {
         `build=${BUILD_FINGERPRINT}`
     );
     const engine = new PaisEngine(client);
-    engine.start();
     client.paisEngine = engine;
+    db.ready
+        .then(() => {
+            console.log('[RPG DB READY]', `fallback=${Boolean(db.usandoFallback)}`);
+            engine.start();
+        })
+        .catch((error) => console.error('[RPG DB ERROR]', error));
 
     let activities = [
             `📦|Utilize ${config.prefix}ajuda para obter ajuda`,
@@ -750,11 +755,10 @@ Estou Ativo com ${client.guilds.cache.size} Servidores, ${client.users.cache.siz
     sendToConfiguredChannel('804504431642542093', { embeds: [embed] }, 'ready');
 });
 
-db.ready
-    .then(() => client.login(process.env.TOKEN))
-    .then(() => {})
+console.log('[DISCORD LOGIN START]');
+client.login(process.env.TOKEN)
     .catch((error) => {
-        console.error('[Inicialização] Firestore ou Discord indisponível:', error);
+        console.error('[DISCORD LOGIN ERROR]', error);
         process.exitCode = 1;
     });
 
